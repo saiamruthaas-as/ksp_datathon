@@ -1,0 +1,4 @@
+Crime data should be searched by crime type, location, and description.
+Theft involves taking property without permission.
+Assault involves threatening or causing physical harm.
+Fraud involves deception for financial gain.
