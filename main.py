@@ -188,8 +188,10 @@ Provide a concise, factual, and professional response in bullet points, using sh
                 response = model.generate_content(prompt)
                 if response and response.text:
                     answer = response.text.strip()
-            except Exception:
-                answer = None
+            except Exception as e:
+                answer = f"Gemini API Error: {str(e)}"
+        else:
+            answer = "System Error: GEMINI_API_KEY is missing. Please add it to your environment variables in Vercel and REDEPLOY."
 
         if not answer:
             top_doc = hits[0]["document"]["text"]
