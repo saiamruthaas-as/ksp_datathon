@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:5000";
+const API_BASE = "https://breeze-ascertain-unwind.ngrok-free.dev";
 
 const messagesDiv = document.getElementById("messages");
 const queryInput = document.getElementById("queryInput");

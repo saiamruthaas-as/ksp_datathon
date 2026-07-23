@@ -6,7 +6,17 @@ from pathlib import Path
 from main import RAGSystem
 
 app = Flask(__name__)
-CORS(app)
+
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "https://kspdatathon06.vercel.app,https://breeze-ascertain-unwind.ngrok-free.dev"
+)
+allowed_origin_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
+
+if allowed_origin_list and allowed_origin_list != ["*"]:
+    CORS(app, resources={r"/api/*": {"origins": allowed_origin_list}})
+else:
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Initialize RAG system
 try:
