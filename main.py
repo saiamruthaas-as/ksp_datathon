@@ -91,7 +91,7 @@ class RAGSystem:
         if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
             try:
                 result = genai.embed_content(
-                    model="models/text-embedding-004",
+                    model="models/gemini-embedding-001",
                     content=text,
                     task_type="retrieval_document"
                 )
@@ -146,7 +146,7 @@ class RAGSystem:
 
         if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-flash-latest")
                 response = model.generate_content(prompt)
                 if response and response.text:
                     return response.text.strip()
@@ -184,7 +184,7 @@ Provide a concise, factual, and professional response in bullet points, using sh
         answer = None
         if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-flash-latest")
                 response = model.generate_content(prompt)
                 if response and response.text:
                     answer = response.text.strip()
