@@ -4,13 +4,17 @@ import json
 import os
 import re
 import sys
-import urllib.request
 from pathlib import Path
 from typing import List, Dict
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "mxbai-embed-large")
-DEFAULT_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "llama3.2")
+try:
+    import google.generativeai as genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
+
+if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
 LANGUAGE_NAMES = {
@@ -20,10 +24,8 @@ LANGUAGE_NAMES = {
 }
 
 class RAGSystem:
-    def __init__(self, data_dir: str, embed_model: str = DEFAULT_EMBED_MODEL, llm_model: str = DEFAULT_LLM_MODEL, top_k: int = 4):
+    def __init__(self, data_dir: str, top_k: int = 4):
         self.data_dir = Path(data_dir)
-        self.embed_model = embed_model
-        self.llm_model = llm_model
         self.top_k = top_k
         self.documents: List[Dict[str, str]] = []
         self.embeddings: List[List[float]] = []
@@ -86,13 +88,17 @@ class RAGSystem:
         self.embeddings = [self._embed_text(doc["text"]) for doc in self.documents]
 
     def _embed_text(self, text: str) -> List[float]:
-        try:
-            payload = {"model": self.embed_model, "prompt": text}
-            response = self._ollama_request("/api/embeddings", payload)
-            if isinstance(response, dict) and "embedding" in response:
-                return response["embedding"]
-        except Exception:
-            pass
+        if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
+            try:
+                result = genai.embed_content(
+                    model="models/text-embedding-004",
+                    content=text,
+                    task_type="retrieval_document"
+                )
+                return result['embedding']
+            except Exception as e:
+                print(f"Gemini embedding failed: {e}")
+                pass
         return self._keyword_embedding(text)
 
     def _keyword_embedding(self, text: str) -> List[float]:
@@ -101,17 +107,6 @@ class RAGSystem:
             if token in counts:
                 counts[token] += 1
         return [counts[token] for token in self.vocabulary]
-
-    def _ollama_request(self, endpoint: str, payload: Dict) -> Dict:
-        data = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            f"{OLLAMA_HOST}{endpoint}",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            return json.loads(response.read().decode("utf-8"))
 
     def retrieve(self, query: str) -> List[Dict[str, object]]:
         query_embedding = self._embed_text(query)
@@ -149,15 +144,14 @@ class RAGSystem:
             f"Text:\n{text}"
         )
 
-        try:
-            payload = {"model": self.llm_model, "prompt": prompt, "stream": False}
-            response = self._ollama_request("/api/generate", payload)
-            if isinstance(response, dict) and "response" in response:
-                translation = response["response"].strip()
-                if translation:
-                    return translation
-        except Exception:
-            pass
+        if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
+            try:
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    return response.text.strip()
+            except Exception:
+                pass
 
         return text
 
@@ -188,15 +182,14 @@ Provide a concise, factual, and professional response in bullet points, using sh
 """
 
         answer = None
-        try:
-            payload = {"model": self.llm_model, "prompt": prompt, "stream": False}
-            response = self._ollama_request("/api/generate", payload)
-            if isinstance(response, dict) and "response" in response:
-                answer = response["response"].strip()
-                if not answer:
-                    answer = None
-        except Exception:
-            answer = None
+        if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
+            try:
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    answer = response.text.strip()
+            except Exception:
+                answer = None
 
         if not answer:
             top_doc = hits[0]["document"]["text"]
@@ -211,19 +204,20 @@ Provide a concise, factual, and professional response in bullet points, using sh
 def main() -> None:
     parser = argparse.ArgumentParser(description="Local RAG assistant for CSV and text crime data")
     parser.add_argument("--data-dir", default="data", help="Folder containing CSV and TXT files")
-    parser.add_argument("--embed-model", default=DEFAULT_EMBED_MODEL, help="Embedding model in Ollama")
-    parser.add_argument("--llm-model", default=DEFAULT_LLM_MODEL, help="Generation model in Ollama")
     parser.add_argument("--query", help="Ask one question and exit")
     parser.add_argument("--top-k", type=int, default=4, help="Number of retrieved chunks")
     args = parser.parse_args()
 
-    rag = RAGSystem(args.data_dir, embed_model=args.embed_model, llm_model=args.llm_model, top_k=args.top_k)
+    if not os.environ.get("GEMINI_API_KEY"):
+        print("Warning: GEMINI_API_KEY not found in environment. Using fallback keyword embeddings.")
+
+    rag = RAGSystem(args.data_dir, top_k=args.top_k)
 
     try:
         rag.build_index()
     except Exception as exc:
         print(f"Initialization failed: {exc}")
-        print("Make sure your data folder exists and that Ollama is running if you want embedding-based retrieval.")
+        print("Make sure your data folder exists.")
         sys.exit(1)
 
     if args.query:
@@ -244,7 +238,6 @@ def main() -> None:
             print(rag.generate_answer(user_query))
         except Exception as exc:
             print(f"Error: {exc}")
-
 
 if __name__ == "__main__":
     main()

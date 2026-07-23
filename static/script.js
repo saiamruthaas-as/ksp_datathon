@@ -1,7 +1,7 @@
 const API_BASE = (
     window.__API_BASE__ ||
     document.querySelector('meta[name="api-base"]')?.content ||
-    "https://breeze-ascertain-unwind.ngrok-free.dev"
+    ""
 ).replace(/\/$/, "");
 
 const messagesDiv = document.getElementById("messages");

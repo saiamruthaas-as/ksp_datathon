@@ -25,15 +25,13 @@ PORT = int(os.getenv("PORT", "5000"))
 try:
     rag = RAGSystem(
         data_dir=os.getenv("DATA_DIR", "data"),
-        embed_model=os.getenv("OLLAMA_EMBED_MODEL", "mxbai-embed-large"),
-        llm_model=os.getenv("OLLAMA_LLM_MODEL", "llama3.2"),
         top_k=int(os.getenv("TOP_K", 4))
     )
     rag.build_index()
     print("RAG system initialized successfully")
 except Exception as exc:
     print(f"Failed to initialize RAG system: {exc}")
-    print("Make sure Ollama is running and data files exist")
+    print("Make sure GEMINI_API_KEY is set and data files exist")
     sys.exit(1)
 
 
@@ -100,8 +98,6 @@ def info():
         "name": "KSP Crime RAG Assistant",
         "version": "1.0.0",
         "documents_loaded": len(rag.documents),
-        "embed_model": rag.embed_model,
-        "llm_model": rag.llm_model,
         "top_k": rag.top_k
     })
 
